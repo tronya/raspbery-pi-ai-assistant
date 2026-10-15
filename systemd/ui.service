@@ -1,0 +1,9 @@
+[Unit]
+Description=Touch menu for the TFT
+After=eyes.service
+[Service]
+ExecStart=/usr/bin/python3 /home/tronyak/ui.py
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

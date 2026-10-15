@@ -1,0 +1,8 @@
+[Unit]
+Description=Animated eyes on TFT
+After=local-fs.target
+[Service]
+ExecStart=/usr/bin/python3 /home/tronyak/eyes.py
+Restart=always
+[Install]
+WantedBy=multi-user.target

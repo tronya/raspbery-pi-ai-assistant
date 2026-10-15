@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram bot for the eyes
+After=network-online.target ollama.service eyes.service
+Wants=network-online.target
+[Service]
+User=tronyak
+ExecStart=/usr/bin/python3 /home/tronyak/bot.py
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

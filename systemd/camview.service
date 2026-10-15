@@ -1,0 +1,7 @@
+[Unit]
+Description=Live camera preview on the TFT
+Conflicts=eyes.service eyetrack.service
+[Service]
+ExecStart=/home/tronyak/venv/bin/python /home/tronyak/camview.py
+ExecStopPost=/bin/systemctl --no-block start eyes.service eyetrack.service
+RuntimeMaxSec=300

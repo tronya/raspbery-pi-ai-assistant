@@ -1,0 +1,11 @@
+[Unit]
+Description=Face tracking for the eyes
+After=eyes.service
+Conflicts=camview.service
+[Service]
+User=tronyak
+ExecStart=/home/tronyak/venv/bin/python /home/tronyak/track.py --log-mood
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target

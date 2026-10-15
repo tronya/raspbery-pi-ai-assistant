@@ -1,0 +1,10 @@
+[Unit]
+Description=Marstek battery logger (read-only, every 30 s)
+After=network-online.target
+[Service]
+User=tronyak
+ExecStart=/usr/bin/python3 /home/tronyak/marstek_logger.py
+Restart=always
+RestartSec=15
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Air-raid alert watcher (Lviv Oblast)
+After=network-online.target eyes-bot.service
+Wants=network-online.target
+[Service]
+User=tronyak
+ExecStart=/usr/bin/python3 /home/tronyak/alertwatch.py
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

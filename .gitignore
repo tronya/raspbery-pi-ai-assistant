@@ -1,0 +1,27 @@
+# secrets and local state: NEVER commit these
+.env
+*.env
+!.env.example
+.pair
+.owner
+touch_cal.json
+ui_settings.json
+worklog.json
+*.db
+*.sqlite
+
+# models and big downloads (see README for where to get them)
+models/
+*.onnx
+*.gguf
+
+# local junk
+_backups/
+venv/
+__pycache__/
+*.pyc
+*.log
+*.jpg
+*.jpeg
+*.png
+.DS_Store
