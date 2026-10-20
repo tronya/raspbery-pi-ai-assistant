@@ -17,6 +17,7 @@ STATE, LOG = "/tmp/worktime_state.json", os.path.join(HOME, "worklog.json")
 BREAK_AFTER = int(os.environ.get("WORK_BREAK_AFTER_S", 180))   # seconds without a face before the session counts as ended
 GREET_MIN = int(os.environ.get("WORK_GREET_MIN_S", 300))      # a break at least this long gets a welcome-back message
 TICK = 5
+QUIET_S = 120               # no messages in the first two minutes after the service starts (boot, restart)
 
 
 def load_env():
@@ -59,35 +60,35 @@ def fmt(seconds):
     return f"{m // 60} г {m % 60} хв" if m >= 60 else f"{m} хв"
 
 
-# Ukrainian lines written by hand: the 1B model cannot write decent Ukrainian. {w} = minutes worked, {a} = minutes away.
+# Ukrainian lines written by hand: the 1B model cannot write decent Ukrainian. {w} = time worked, {a} = time away (already formatted, e.g. "52 хв").
 BANK = {
     "back": [
-        ("happy", "З поверненням! Відпочив {a} хв — тепер мозок як новенький. Працюємо?"),
+        ("happy", "З поверненням! Відпочив {a} — тепер мозок як новенький. Працюємо?"),
         ("excited", "О, ти повернувся! Я вже соромився сам дивитись у порожній стілець."),
         ("happy", "Привіт знову! Чай випито, ноги розім'яті — готовий до подвигів?"),
         ("love", "Нарешті! Я тут майже встиг заснути. Ну що, береш на себе нові задачі?"),
-        ("happy", "Бачу тебе — і все на місці. {a} хв відпочинку, а далі знову в бій!"),
+        ("happy", "Бачу тебе — і все на місці. {a} відпочинку, а далі знову в бій!"),
         ("excited", "Є контакт! Перерва скінчилась — дай п'ять уявною лапкою й вперед."),
         ("happy", "З поверненням у стрій! Цікавий факт: після перерви мозок працює краще. Перевіримо?"),
         ("love", "Скучив! Можеш не поспішати... ну, може, трішки поспішай. Готовий?"),
         ("excited", "Ти повернувся, а отже день ще не програно. Починаємо?"),
         ("happy", "Ласкаво просимо назад! Вода є, думки є — лишилось сісти й зробити."),
-        ("happy", "Ага, хтось сьогодні вже попрацював {w} хв. Повага. Продовжимо?"),
+        ("happy", "Ага, хтось сьогодні вже попрацював {w}. Повага. Продовжимо?"),
         ("excited", "Перерва закінчилась, а я ні! Гей, давай зробимо щось круте."),
     ],
     "back_long": [
-        ("happy", "Нічого собі, тебе не було {a} хв! Сподіваюсь, ти встиг і пообідати, і відпочити."),
+        ("happy", "Нічого собі, тебе не було {a}! Сподіваюсь, ти встиг і пообідати, і відпочити."),
         ("excited", "Довгоочікуваний герой повернувся! Я трохи охолов — розігріваємось?"),
-        ("love", "{a} хвилин без тебе — це вічність. Радий, що ти знову тут!"),
+        ("love", "Без тебе було порожньо {a} — це вічність. Радий, що ти знову тут!"),
     ],
     "remind": [
-        ("sleepy", "Ти вже {w} хв у роботі. Потягнись, випий води й поглянь у вікно!"),
+        ("sleepy", "Ти вже {w} у роботі. Потягнись, випий води й поглянь у вікно!"),
         ("happy", "Маленька пауза? Подивись на щось далеке 20 секунд — очі подякують."),
         ("sleepy", "Факт: очі втомлюються швидше за голову. Дай їм хвилинку відпочинку!"),
-        ("love", "Ти молодець, {w} хв поспіль! А тепер встань і розімни плечі."),
+        ("love", "Ти молодець, {w} поспіль! А тепер встань і розімни плечі."),
         ("happy", "Час на склянку води. Я стежу, щоб ти не перетворився на кактус."),
         ("sleepy", "Спина просить розминки. Ти ж не хочеш образити спину?"),
-        ("excited", "Вже {w} хв — це хвилин сорок п'ять спокійної праці. Крок до чайника?"),
+        ("excited", "Вже {w} спокійної праці. Крок до чайника?"),
         ("happy", "Жарт: програмісти п'ють каву, бо без неї компілятор не розуміє. Піди зроби?"),
         ("sleepy", "Мої очі закриваються за тебе. Приєднаєшся до перерви?"),
         ("love", "Ти сьогодні в хорошій формі! Нагорода — п'ять хвилин відпочинку."),
@@ -95,11 +96,18 @@ BANK = {
         ("excited", "Секретний прийом: встань, потягнись угору, видихни. Працює краще за каву!"),
     ],
     "remind_long": [
-        ("sleepy", "{w} хв без перерви! Ти не робот, а я вже й так достатньо дивний. Перерва?"),
-        ("excited", "Ого, {w} хв поспіль! Відпочинок — не слабкість, а паливо. Заправляйся!"),
+        ("sleepy", "{w} без перерви! Ти не робот, а я вже й так достатньо дивний. Перерва?"),
+        ("excited", "Ого, {w} поспіль! Відпочинок — не слабкість, а паливо. Заправляйся!"),
     ],
 }
 _decks = {}
+
+
+def fmt_min(m):
+    m = int(m)
+    if m >= 1440:
+        return f"{m // 1440} д {m % 1440 // 60} г"
+    return f"{m // 60} г {m % 60} хв" if m >= 60 else f"{m} хв"
 
 
 def pick_bank(kind, info):
@@ -108,7 +116,7 @@ def pick_bank(kind, info):
     if not deck:
         deck = _decks[kind] = random.sample(BANK[kind], len(BANK[kind]))
     emo, text = deck.pop()
-    return emo, text.format(w=info.get("worked", 0), a=info.get("away", 0))
+    return emo, text.format(w=fmt_min(info.get("worked", 0)), a=fmt_min(info.get("away", 0)))
 
 
 THEMES = ["a tiny fun fact", "a light joke", "a warm compliment", "a playful challenge", "a calm, cosy remark",
@@ -155,7 +163,7 @@ def generate_llm(kind, info):
         return (emo if emo in ("happy", "excited", "love", "sleepy", "thinking") else "happy"), text
     except Exception as e:
         print("generation failed, using fallback:", e, flush=True)
-        return "happy", random.choice(FALLBACK[kind]).format(w=info.get("worked", 0), a=info.get("away", 0))
+        return "happy", random.choice(FALLBACK[kind]).format(w=fmt_min(info.get("worked", 0)), a=fmt_min(info.get("away", 0)))
     finally:
         try:
             os.remove(PAUSE)
@@ -200,39 +208,48 @@ def last_seen():
         return 0.0
 
 
-mode, away_since, session_start, next_remind, last_worked = "away", 0.0, 0.0, 0.0, 0.0
-seen_before = False
+# The Pi has no battery-backed clock: after a boot the wall clock can jump by hours or days once NTP syncs.
+# So every duration below is measured on the monotonic clock; wall time is only used for the log date and the UI.
+mode, away_since_m, session_start_m, next_remind_m, last_worked = "away", 0.0, 0.0, 0.0, 0.0
+prev_pres, seen_m = None, 0.0
+started_m = time.monotonic()
 print("worktime started; model", MODEL, "remind every", REMIND_MIN, "min", flush=True)
 while True:
     try:
-        now, seen = time.time(), last_seen()
+        mono, wall = time.monotonic(), time.time()
+        pres = last_seen()
+        if prev_pres is None:
+            prev_pres = pres                              # first look: whatever is in the file is old news
+        elif pres != prev_pres:
+            prev_pres, seen_m = pres, mono                # the tracker wrote a new value: somebody is at the desk now
         if os.path.exists(PAUSE) and mode == "work":
-            seen = max(seen, now)                         # tracker paused on purpose: do not count it as absence
-        if mode == "away" and seen and now - seen < 15:
-            away = (seen - away_since) if away_since else 0
-            mode, session_start, next_remind = "work", seen, seen + REMIND_MIN * 60
-            if away_since and away >= GREET_MIN:
+            seen_m = mono                                 # tracker paused on purpose: do not count it as absence
+        quiet = mono - started_m < QUIET_S
+        if mode == "away" and seen_m and mono - seen_m < 15:
+            away = (seen_m - away_since_m) if away_since_m else 0
+            mode, session_start_m, next_remind_m = "work", seen_m, seen_m + REMIND_MIN * 60
+            if away_since_m and away >= GREET_MIN and not quiet:
                 emo, text = generate("back", {"away": int(away // 60), "worked": int(last_worked // 60)})
                 say(emo, text)
                 telegram(f"👋 {text}\n(перерва {fmt(away)}, до того працювали {fmt(last_worked)})")
                 print("welcome back after", fmt(away), flush=True)
             else:
                 print("session started", flush=True)
-            seen_before = True
         elif mode == "work":
-            if now - seen > BREAK_AFTER:
-                last_worked = seen - session_start
-                add_work(last_worked, session_start)
-                mode, away_since = "away", seen
+            if mono - seen_m > BREAK_AFTER:
+                last_worked = seen_m - session_start_m
+                add_work(last_worked, wall - (mono - session_start_m))
+                mode, away_since_m = "away", seen_m
                 print("session ended, worked", fmt(last_worked), flush=True)
-            elif now >= next_remind:
-                worked = now - session_start
+            elif mono >= next_remind_m and not quiet:
+                worked = mono - session_start_m
                 emo, text = generate("remind", {"worked": int(worked // 60)})
                 say(emo, text)
                 telegram(f"⏰ {text}\n(працюєте вже {fmt(worked)})")
-                next_remind += REMIND_MIN * 60
+                next_remind_m = mono + REMIND_MIN * 60    # always a full interval ahead: never a burst of catch-up reminders
                 print("reminder after", fmt(worked), flush=True)
-        write_state(mode, away_since if mode == "away" else session_start, session_start)
+        to_wall = lambda m: (wall - (mono - m)) if m else 0.0
+        write_state(mode, to_wall(away_since_m) if mode == "away" else to_wall(session_start_m), to_wall(session_start_m))
     except Exception as e:
         print("error:", e, flush=True)
     time.sleep(TICK)

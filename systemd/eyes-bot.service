@@ -1,7 +1,7 @@
 [Unit]
+After=network-online.target time-sync.target ollama.service eyes.service
+Wants=network-online.target time-sync.target
 Description=Telegram bot for the eyes
-After=network-online.target ollama.service eyes.service
-Wants=network-online.target
 [Service]
 User=tronyak
 ExecStart=/usr/bin/python3 /home/tronyak/bot.py

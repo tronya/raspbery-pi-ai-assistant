@@ -69,7 +69,9 @@ def set_flag(path, on, text=""):
             pass
 
 
-state, since, nb_prev = None, None, set()
+state, since = None, None
+nb_cnt, nb_confirmed, nb_last_msg, nb_msg_sent, first = {}, set(), {}, False, True
+NB_POLLS, NB_COOLDOWN = 3, 1800     # a neighbour must stay in alert for 3 polls (~90 s); at most one message per 30 min each
 print("alertwatch started for", OBLAST, "+ neighbours", list(NEIGHBOURS), flush=True)
 while True:
     try:
@@ -82,12 +84,12 @@ while True:
         if now_active:
             set_flag(FLAG, True, "ТРИВОГА! " + OBLAST.replace(" область", " обл."))
         if now_active and state is not True:
-            since = time.time()
+            since = time.monotonic()
             telegram(f"🚨 Повітряна тривога: {OBLAST}\nРайони: " + ", ".join(districts))
             print("ALERT", districts, flush=True)
         elif not now_active and state is True:
             set_flag(FLAG, False)
-            mins = int((time.time() - since) / 60) if since else 0
+            mins = int((time.monotonic() - since) / 60) if since else 0
             telegram(f"✅ Відбій тривоги: {OBLAST} (тривала ~{mins} хв)")
             print("clear", flush=True)
         elif not now_active:
@@ -100,15 +102,27 @@ while True:
             set_flag(WARN, True, "Поруч: " + names[0] + (f" +{len(names) - 1}" if len(names) > 1 else ""))
         else:
             set_flag(WARN, False)
-        started = near - nb_prev
+        # flickering neighbours must not spam: confirm over several polls, then rate-limit per oblast
+        for o in NEIGHBOURS:
+            nb_cnt[o] = nb_cnt.get(o, 0) + 1 if o in near else 0
+        confirmed = {o for o in near if nb_cnt[o] >= NB_POLLS}
+        mono = time.monotonic()
+        started = {o for o in confirmed - nb_confirmed if mono - nb_last_msg.get(o, -1e9) > NB_COOLDOWN}
+        if first:                                     # right after (re)start only learn the situation, say nothing
+            nb_last_msg.update({o: mono for o in confirmed})
+            started = set()
         if started and not now_active:
             lines = [f"• {o}: " + ", ".join(by[o][:4]) + (f" та ще {len(by[o]) - 4}" if len(by[o]) > 4 else "") for o in sorted(started)]
             telegram("⚠️ Тривога в суміжній області (до Львівщини близько):\n" + "\n".join(lines))
+            nb_last_msg.update({o: mono for o in started})
+            nb_msg_sent = True
             print("NEIGHBOUR ALERT", sorted(started), flush=True)
-        elif nb_prev and not near and not now_active:
+        elif nb_msg_sent and not near and not now_active:
             telegram("🟢 У суміжних областях відбій.")
+            nb_msg_sent = False
             print("neighbours clear", flush=True)
-        nb_prev = near
+        nb_confirmed = confirmed
+        first = False
     except Exception as e:
         print("poll error:", e, flush=True)
     time.sleep(POLL)

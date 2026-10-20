@@ -72,7 +72,7 @@ print("marstek logger started: ip", IP, "every", INTERVAL, "s ->", DB, flush=Tru
 
 cycle = 0
 flags = {"low1": False, "low2": False, "full": False}
-last_ok, offline_sent = time.time(), False
+last_ok, offline_sent = time.monotonic(), False      # monotonic: the wall clock may jump at boot
 while True:
     t0 = time.time()
     es, bat, mode = call("ES.GetStatus"), call("Bat.GetStatus"), call("ES.GetMode")
@@ -107,11 +107,11 @@ while True:
     # --- Telegram alerts (with hysteresis, so each fires once per event)
     soc = row[1]
     if ok:
-        last_ok = t0
+        last_ok = time.monotonic()
         if offline_sent:
             offline_sent = False
             telegram("✅ Marstek знову на зв'язку" + (f" (заряд {soc:g}%)" if soc is not None else ""))
-    elif not offline_sent and t0 - last_ok > OFFLINE_MIN * 60:
+    elif not offline_sent and time.monotonic() - last_ok > OFFLINE_MIN * 60:
         offline_sent = True
         telegram(f"⚠️ Marstek не відповідає вже {OFFLINE_MIN} хв (Wi-Fi, живлення?)")
     if soc is not None:

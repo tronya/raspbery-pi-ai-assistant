@@ -1,7 +1,7 @@
 [Unit]
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 Description=Air-raid alert watcher (Lviv Oblast)
-After=network-online.target eyes-bot.service
-Wants=network-online.target
 [Service]
 User=tronyak
 ExecStart=/usr/bin/python3 /home/tronyak/alertwatch.py

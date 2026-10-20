@@ -1,6 +1,7 @@
 [Unit]
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 Description=Work-time companion (presence, breaks, reminders)
-After=network-online.target eyes-bot.service
 [Service]
 User=tronyak
 ExecStart=/usr/bin/python3 /home/tronyak/worktime.py

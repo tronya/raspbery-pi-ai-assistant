@@ -217,6 +217,11 @@ def main():
             f.write(secrets.token_hex(3))
         os.chmod(pair, 0o600)
     history, offset = [], 0
+    try:                                   # commands sent while the Pi was off are stale (a /photo from last week!): skip them
+        last = tg("getUpdates", offset=-1, timeout=0)["result"]
+        offset = last[-1]["update_id"] + 1 if last else 0
+    except Exception as e:
+        print("could not skip the backlog:", e, flush=True)
     print("bot started, owner:", owner_id(), flush=True)
     while True:
         try:

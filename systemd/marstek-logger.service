@@ -1,6 +1,7 @@
 [Unit]
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 Description=Marstek battery logger (read-only, every 30 s)
-After=network-online.target
 [Service]
 User=tronyak
 ExecStart=/usr/bin/python3 /home/tronyak/marstek_logger.py
