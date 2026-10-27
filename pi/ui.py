@@ -23,6 +23,8 @@ SET = os.path.join(HOME, "ui_settings.json")
 DB = os.path.join(HOME, "marstek.db")
 IDLE_S = 40                      # back to the eyes after this long without a touch
 CAMERA_MAX_S = 180
+PARTICLES_MAX_S = 900
+PX0, PX1, PY0, PW = 128, 352, 48, 224     # the particle picture: 224x224 px in the middle of the screen
 ROT = 1                          # same rotation as eyes.py
 
 BG, TILE, TILE2 = (12, 14, 22), (30, 36, 54), (44, 52, 76)
@@ -186,6 +188,10 @@ def icon(d, kind, cx, cy, c=ACC):
         d.ellipse([cx - 11, cy - 9, cx - 5, cy - 3], fill=c)
         d.ellipse([cx + 5, cy - 9, cx + 11, cy - 3], fill=c)
         d.arc([cx - 12, cy - 4, cx + 12, cy + 14], 20, 160, fill=c, width=3)
+    elif kind == "particles":
+        for dx, dy, col in ((-9, 6, (90, 255, 235)), (10, 6, (255, 200, 70)), (0, -9, (235, 235, 245))):
+            d.ellipse([cx + dx - 13, cy + dy - 13, cx + dx + 13, cy + dy + 13], outline=col, width=3)
+            d.ellipse([cx + dx - 2, cy + dy - 2, cx + dx + 2, cy + dy + 2], fill=col)
     elif kind == "eyes":
         for dx in (-13, 13):
             d.ellipse([cx + dx - 11, cy - 15, cx + dx + 11, cy + 15], outline=c, width=3)
@@ -241,6 +247,18 @@ class App:
         open(FLAG, "w").close()
         if screen == "camera":
             self.start_camera()
+        elif screen == "particles":
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import particles                                  # imported late: numpy-heavy, only needed here
+            self.scene = particles.Scene(PW)
+            im = Image.new("RGB", (LW, LH), (0, 0, 0))          # black screen with a back button; later only the middle is redrawn
+            d = ImageDraw.Draw(im)
+            d.rounded_rectangle([8, 8, 76, 48], radius=10, fill=TILE)
+            d.polygon([(26, 28), (40, 16), (40, 40)], fill=TXT)
+            d.text((46, 28), "назад", font=F12, fill=TXT, anchor="lm")
+            show(im)
+            self.buttons = [((0, 0, 90, 60), "back")]
 
     def set_setting(self, key, value):
         self.settings[key] = value
@@ -293,8 +311,8 @@ class App:
         d.text((16, 22), "Меню", font=F20, fill=TXT, anchor="lm")
         d.text((LW - 16, 22), time.strftime("%H:%M"), font=F20, fill=DIM, anchor="rm")
         tiles = [("battery", "Marstek", "marstek"), ("camera", "Камера", "camera"), ("system", "Система", "system"),
-                 ("work", "Робота", "work"), ("emotions", "Емоції", "emotions"), ("settings", "Налаштув.", "settings"),
-                 ("eyes", "Очі", "eyes")]
+                 ("work", "Робота", "work"), ("emotions", "Емоції", "emotions"), ("particles", "Частинки", "particles"),
+                 ("settings", "Налаштув.", "settings"), ("eyes", "Очі", "eyes")]
         self.buttons = []
         for i, (ic, label, target) in enumerate(tiles):
             col, row = i % 4, i // 4
@@ -450,6 +468,19 @@ class App:
             self.buttons.append((rect, "emo_" + key))
         return im
 
+    def draw_particles(self):
+        f = self.scene.frame()
+        arr = np.zeros((LH, PW, 3), np.uint8)
+        arr[PY0:PY0 + PW] = f
+        rot = np.rot90(arr, ROT)                                # PW rows of the portrait framebuffer
+        r = (rot[..., 0].astype(np.uint16) >> 3) << 11
+        g = (rot[..., 1].astype(np.uint16) >> 2) << 5
+        b = rot[..., 2].astype(np.uint16) >> 3
+        with open("/dev/fb0", "r+b", buffering=0) as fb:
+            fb.seek((LW - PX1) * 320 * 2)
+            fb.write((r | g | b).astype("<u2").tobytes())
+        return None
+
     def draw_confirm(self):
         im, d = new()
         d.text((LW // 2, 100), self.confirm[0], font=F26, fill=TXT, anchor="mm")
@@ -513,11 +544,13 @@ class App:
             if x0 <= pos[0] <= x1 and y0 <= pos[1] <= y1:
                 self.do(action)
                 return
+        if self.screen == "particles":
+            self.scene.tap()
 
     def do(self, action):
         if action == "back":
             self.go("home")
-        elif action in ("marstek", "camera", "system", "work", "settings"):   # simple screens
+        elif action in ("marstek", "camera", "system", "work", "settings", "particles"):   # simple screens
             self.go(action)
         elif action == "eyes":
             self.go("eyes")
@@ -559,7 +592,7 @@ class App:
         last_shown, last_frame = 0.0, None
         while True:
             try:
-                raw = self.touch.q.get(timeout=0.12)
+                raw = self.touch.q.get(timeout=0.004 if self.screen == "particles" else 0.12)
                 self.on_tap(raw)
                 last_shown = 0
                 while not self.touch.q.empty():
@@ -569,17 +602,20 @@ class App:
             if self.screen == "eyes":
                 continue
             now = time.time()
-            limit = CAMERA_MAX_S if self.screen == "camera" else IDLE_S
+            limit = CAMERA_MAX_S if self.screen == "camera" else PARTICLES_MAX_S if self.screen == "particles" else IDLE_S
             if self.screen != "calibrate" and now - max(self.last_touch, self.entered) > limit:
                 self.go("eyes")
                 continue
-            period = 0.12 if self.screen == "camera" else 1.0
+            period = 0.12 if self.screen == "camera" else 0.03 if self.screen == "particles" else 1.0
             if now - last_shown < period:
                 continue
             draw = {"home": self.draw_home, "marstek": self.draw_marstek, "system": self.draw_system, "work": self.draw_work,
-                    "settings": self.draw_settings, "emotions": self.draw_emotions, "confirm": self.draw_confirm, "calibrate": self.draw_calibrate,
+                    "settings": self.draw_settings, "emotions": self.draw_emotions, "particles": self.draw_particles, "confirm": self.draw_confirm, "calibrate": self.draw_calibrate,
                     "camera": self.draw_camera}[self.screen]
             im = draw()
+            if self.screen == "particles":                  # drawn straight into the framebuffer by draw_particles
+                last_shown = now
+                continue
             if im is not None:
                 key = hash(im.tobytes())
                 if key != last_frame:                       # do not push identical frames over the slow SPI bus
