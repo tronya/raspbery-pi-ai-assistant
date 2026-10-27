@@ -250,7 +250,7 @@ def main():
                 if text.startswith("/"):
                     cmd = text[1:].split("@")[0].lower()
                     if cmd == "start":
-                        tg("sendMessage", chat_id=cid, text="Привіт! Пиши мені — відповім. Команди: /" + ", /".join(EMOTIONS + EXTRA) + ", /work, /battery, /status, /screen, /photo, /reset")
+                        tg("sendMessage", chat_id=cid, text="Привіт! Пиши мені — відповім. Команди: /" + ", /".join(EMOTIONS + EXTRA) + ", /work, /battery, /status, /screen, /photo, /particles, /reset")
                     elif cmd in EMOTIONS + EXTRA:
                         eyes(cmd)
                     elif cmd == "battery":
@@ -264,6 +264,9 @@ def main():
                             subprocess.run(["sudo", "rm", "-f", p])
                         else:
                             tg("sendMessage", chat_id=cid, text="Не вдалося зняти екран.")
+                    elif cmd == "particles":
+                        open("/tmp/ui_cmd", "w").write("particles")             # ui.py opens the particle screen
+                        tg("sendMessage", chat_id=cid, text="✨ Частинки на екрані (торкніться: перемикає біла / три в центрі / три окремо)")
                     elif cmd == "photo":
                         eyes("wink")
                         p = take_photo()

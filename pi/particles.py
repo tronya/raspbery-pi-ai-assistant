@@ -8,8 +8,8 @@ R_MIN..R_MAX, drag with "capture" wells, a speed limit and a hard clamp. Colours
 original's too: dense places add up to white, thin places show single coloured dots.
 (The simplex noise of the shader is replaced by a cheap sine noise.)
 
-Modes (tap switches): 0 all three planets gathered in the middle, 1 three separate balls in a triangle,
-2 only the white planet. Run `python3 particles.py --bench` to time it and write preview PNGs.
+Modes (tap switches): 2 only the white planet (the default), 0 all three planets gathered in the middle,
+1 three separate balls in a triangle, then back to 2. Run `python3 particles.py --bench` to time it and write preview PNGs.
 """
 import math
 import time
@@ -110,16 +110,16 @@ class Scene:
         # each planet spins about its own (slowly precessing) axis
         self.paxis0 = normalize(np.stack([np.sin(np.arange(3) * 12.9 + 1), np.cos(np.arange(3) * 7.3 + 2), np.sin(np.arange(3) * 4.1 + 3)], 1))
         self.t = 0.0
-        self.mode = 0
+        self.mode = 2                          # start with only the white planet
         self.mix = 0.0                         # 0 = gathered, 1 = spread triangle
-        self.vis = np.array([1.0, 1.0, 1.0])
+        self.vis = np.array([0.0, 0.0, 1.0])
         self.t0 = time.time()
         self.last = self.t0
         self.pulse = 0.0
 
     # ---------------------------------------------------------------- interaction
     def tap(self):
-        """Burst, and switch mode: gathered -> spread -> only the white planet -> gathered."""
+        """Burst, and switch mode: only white -> gathered -> spread -> only white."""
         self.mode = (self.mode + 1) % 3
         r = np.linalg.norm(self.rel, axis=1, keepdims=True)
         self.vel += self.rel / np.maximum(r, 1e-4) * 2.5               # a radial kick, the physics pulls it back
@@ -222,7 +222,8 @@ class Scene:
         rel_r = self.rel @ R.T
         pos = rel_r + (cen @ R.T).astype(np.float32)[self.pl]
         persp = 14.0 / (14.0 - np.clip(pos[:, 2], -8.0, 8.0))
-        scale = size * 0.114 * (1 - 0.55 * m)
+        solo = 1.0 - max(self.vis[0], self.vis[1])                    # 1 when only the white planet is shown
+        scale = size * 0.114 * (1 - 0.55 * m) * (1 + 0.5 * solo)       # a lone planet is drawn larger
         px = size / 2 + pos[:, 0] * persp * scale
         py = size / 2 - pos[:, 1] * persp * scale
 
@@ -237,7 +238,7 @@ class Scene:
         col = col * (1 - np.clip(sp * 0.05, 0, 0.18))[:, None] + np.clip(sp * 0.05, 0, 0.18)[:, None]
         facing = rel_r[:, 2] / np.maximum(r, 1e-4)
         alpha = (0.30 + 0.70 * smooth(-1.0, 1.0, facing)) * (0.6 + 0.5 * np.clip(sp, 0, 1.5))
-        wgt = (alpha * persp * 1.9 * self.vis[self.pl] * (1 + 0.8 * self.pulse)).astype(np.float32)
+        wgt = (alpha * persp * 1.9 * self.vis[self.pl] * (1 + 0.8 * self.pulse) * (1 + 1.2 * solo)).astype(np.float32)
 
         fx0, fy0 = np.floor(px), np.floor(py)
         fx, fy = (px - fx0).astype(np.float32), (py - fy0).astype(np.float32)

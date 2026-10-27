@@ -599,6 +599,15 @@ class App:
                     self.touch.q.get_nowait()
             except queue.Empty:
                 pass
+            if os.path.exists("/tmp/ui_cmd"):                 # open a screen from outside (e.g. the Telegram bot)
+                try:
+                    want = open("/tmp/ui_cmd").read().strip()
+                    os.remove("/tmp/ui_cmd")
+                    if want in ("particles", "home", "marstek", "camera", "system", "work", "settings", "emotions"):
+                        self.go(want)
+                        last_shown = 0
+                except OSError:
+                    pass
             if self.screen == "eyes":
                 continue
             now = time.time()
