@@ -254,11 +254,11 @@ class App:
             self.scene = particles.Scene(PW)
             im = Image.new("RGB", (LW, LH), (0, 0, 0))          # black screen with a back button; later only the middle is redrawn
             d = ImageDraw.Draw(im)
-            d.rounded_rectangle([8, 8, 76, 48], radius=10, fill=TILE)
-            d.polygon([(26, 28), (40, 16), (40, 40)], fill=TXT)
-            d.text((46, 28), "назад", font=F12, fill=TXT, anchor="lm")
+            d.rounded_rectangle([8, 8, 100, 48], radius=10, fill=TILE)                       # wide enough for the word
+            d.polygon([(24, 28), (36, 16), (36, 40)], fill=TXT)
+            d.text((44, 28), "назад", font=F14, fill=TXT, anchor="lm")
             show(im)
-            self.buttons = [((0, 0, 90, 60), "back")]
+            self.buttons = [((0, 0, 112, 60), "back")]
 
     def set_setting(self, key, value):
         self.settings[key] = value
