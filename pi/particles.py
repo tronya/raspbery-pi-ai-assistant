@@ -223,7 +223,7 @@ class Scene:
         pos = rel_r + (cen @ R.T).astype(np.float32)[self.pl]
         persp = 14.0 / (14.0 - np.clip(pos[:, 2], -8.0, 8.0))
         solo = 1.0 - max(self.vis[0], self.vis[1])                    # 1 when only the white planet is shown
-        scale = size * 0.114 * (1 - 0.55 * m) * (1 + 0.5 * solo)       # a lone planet is drawn larger
+        scale = size * 0.114 * (1 - 0.55 * m) * (1 + 0.95 * solo)      # a lone planet is drawn larger
         px = size / 2 + pos[:, 0] * persp * scale
         py = size / 2 - pos[:, 1] * persp * scale
 
