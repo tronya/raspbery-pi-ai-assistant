@@ -49,7 +49,7 @@ EMO = {
     "talking":   dict(open=1.0,  tl=0,   tr=0,   lift=0.1, mc=0.2,  mo=0.0, gx=0,    gy=0,    ps=1.0),
 }
 BASE = dict(open=1.0, tl=0, tr=0, lift=0.0, mc=0.0, mo=0.0, gx=0, gy=0, ps=1.0,
-            tears=0.0, shk=0.0, bgt=0.0, zz=0.0, bb=0.0, bhl=0.0, bhr=0.0, btl=0.0, btr=0.0, mxs=0.0, mww=50.0, qm=0.0,
+            tears=0.0, shk=0.0, bgt=0.0, zz=0.0, bb=0.0, bhl=0.0, bhr=0.0, btl=0.0, btr=0.0, mxs=0.0, mww=50.0, qm=0.0, ty=0.0,
             sl="round", sr="round")   # sl/sr: eye shape (left/right)
 for _v in EMO.values():
     for _k, _d in BASE.items():
@@ -148,7 +148,7 @@ for _k, _v in EMO.items():
     _v["cr"], _v["cg"], _v["cb"] = COL.get(_k, (255, 255, 255))
     _v["cyo"] = 0
     _v["es"] = 1.0                      # eye size, driven by the distance to the face
-KEYS = ["open", "tl", "tr", "lift", "mc", "mo", "gx", "gy", "ps", "cr", "cg", "cb", "cyo", "es", "tears", "shk", "bgt", "zz", "bb", "bhl", "bhr", "btl", "btr", "mxs", "mww", "qm"]
+KEYS = ["open", "tl", "tr", "lift", "mc", "mo", "gx", "gy", "ps", "cr", "cg", "cb", "cyo", "es", "tears", "shk", "bgt", "zz", "bb", "bhl", "bhr", "btl", "btr", "mxs", "mww", "qm", "ty"]
 
 
 try:
@@ -257,7 +257,7 @@ def render(p, blink, pupil_on, status=None, caption=None, alert=None):
         o = max(0.0, min(1.25, p["open"] * blink))
         ry = RY * p["es"] * (1.0 if o <= 1 else o)
         ex = 240 - X0 + (cx - 240) * p["es"] + p["gx"] * 38      # the whole eye follows the gaze
-        ey = cyb + p["gy"] * 22 + YOFF[i] * p["es"]
+        ey = cyb + p["gy"] * 22 + YOFF[i] * p["es"] + p["ty"] * (9 if i == 0 else -9)
         # slight perspective: the eye on the far side of the gaze gets a bit narrower
         RX_ = RX * p["es"] * (1 + 0.2 * p["gx"] * (1 if i == 0 else -1))
         tnow = time.time()
@@ -419,6 +419,21 @@ def to565(rgb):
     return (r | g | b).astype("<u2")
 
 
+ANIM_DUR = {"roll": 2.4, "scan": 4.0, "yawn": 2.8, "peek": 2.0, "wiggle": 1.2, "dtake": 2.2, "squint": 1.6,
+            "browup": 1.0, "tilt": 3.5, "droop": 3.0, "mini": 4.5}
+
+
+def new_anim_data(kind):
+    """Random details chosen once when an animation starts."""
+    if kind == "peek":
+        return {"cx": random.choice([-1, 1]) * 0.95, "cy": random.choice([-0.7, 0.6])}
+    if kind in ("browup", "tilt", "dtake", "wiggle"):
+        return {"side": random.choice([0, 1]), "dir": random.choice([-1, 1])}
+    if kind == "mini":
+        return {"emo": random.choice(["curious", "smug", "happy", "bored", "suspicious"])}
+    return {}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--demo", action="store_true")
@@ -448,7 +463,8 @@ def main():
     cfg_t, ui_was = 0.0, False
     explicit_t0 = 0.0                         # last time an emotion was set by a command (bot/user)
     shape, pending_shape, last_emo = ("round", "round"), None, "neutral"
-    anim, sleep_next, next_idle = None, False, time.time() + 30       # short scripted animations and idle behaviours
+    anim, sleep_next, next_idle = None, False, time.time() + 12       # short scripted animations and idle behaviours
+    anim_data, blink_dur, next_jit, jit = {}, 0.22, 0.0, (0.0, 0.0)
     nfr, nrows, fps_t0 = 0, 0, time.time()
     emo_t0 = time.time()
     demo_list = ["neutral", "happy", "talking", "angry", "sad", "thinking", "surprised", "sleepy"]
@@ -487,8 +503,11 @@ def main():
                     look = {"left": (-1, 0), "right": (1, 0), "up": (0, -1), "down": (0, 1), "center": None}.get(c[5:], None)
                 elif c == "blink":
                     blink_t0 = t0
-                elif c in ("roll", "scan", "yawn_only"):
-                    anim = (c if c != "yawn_only" else "yawn", t0, {"roll": 2.4, "scan": 4.0}.get(c, 2.8))
+                elif c == "slowblink":
+                    blink_t0, blink_dur = t0, 0.7
+                elif c in ANIM_DUR or c == "yawn_only":
+                    kind_c = "yawn" if c == "yawn_only" else c
+                    anim, anim_data = (kind_c, t0, ANIM_DUR[kind_c]), new_anim_data(kind_c)
                 elif c in ("mouth on", "mouth off"):
                     mouth = c.endswith("on")
                 elif c == "busy on":
@@ -593,11 +612,20 @@ def main():
             g["mc"] = -0.12 + 0.22 * math.sin(t0 * 2.6)                      # the lips fidget
         if emo == "yawn" and (anim is None or anim[0] != "yawn") and not sleep_next:
             anim = ("yawn", t0, 2.8)                  # the yawn emotion plays its own animation
-        if emo == "neutral" and anim is None and not caption and busy_t0 is None and t0 > next_idle \
-                and not (track is not None and t0 - track_t < 1.0):
-            anim = (random.choice(["scan", "roll", "scan"]), t0, 0.0)       # idle: look around now and then
-            anim = (anim[0], t0, 4.0 if anim[0] == "scan" else 2.4)
-            next_idle = t0 + random.uniform(25, 60)
+        tracking = track is not None and t0 - track_t < 1.0
+        if emo == "neutral" and anim is None and not caption and busy_t0 is None and t0 > next_idle:
+            if tracking:                                  # somebody is there: only gentle things that keep the gaze on them
+                kind_i = random.choice(["squint", "browup", "tilt", "droop", "slowblink", "browup"])
+            else:
+                kind_i = random.choice(["scan", "peek", "peek", "dtake", "squint", "browup", "tilt", "slowblink",
+                                        "droop", "wiggle", "roll", "mini", "mini"])
+            if kind_i == "slowblink":
+                blink_t0, blink_dur = t0, 0.7
+            else:
+                anim, anim_data = (kind_i, t0, ANIM_DUR[kind_i]), new_anim_data(kind_i)
+                if kind_i == "mini":
+                    emo = anim_data["emo"]; tgt = dict(EMO[emo]); emo_t0 = t0
+            next_idle = t0 + random.uniform(15, 35 if tracking else 24)
         if anim:
             kind_, a0, dur_ = anim
             ph = (t0 - a0) / dur_
@@ -609,6 +637,35 @@ def main():
                     elif emo == "yawn":
                         emo = "neutral"; tgt = dict(EMO["neutral"])
                     sleep_next = False
+                elif kind_ == "mini" and emo == anim_data.get("emo"):
+                    emo = "neutral"; tgt = dict(EMO["neutral"])
+            elif kind_ == "peek":                    # a quick look into a corner, then back
+                if 0.1 <= ph < 0.7:
+                    g["gx"], g["gy"] = anim_data["cx"], anim_data["cy"]
+                    g["bb"], g["bhl"], g["bhr"] = 1.0, 0.4, 0.4
+            elif kind_ == "wiggle":                  # the eyes shimmy left and right
+                g["gx"], g["gy"] = 0.8 * math.sin(ph * 2 * math.pi * 3), 0.0
+            elif kind_ == "dtake":                   # double take: look away, snap back wide-eyed
+                if ph < 0.3:
+                    g["gx"], g["gy"] = 0.9 * anim_data["dir"], -0.1
+                elif ph < 0.65:
+                    g["gx"], g["gy"] = 0.0, 0.0
+                    g["open"], g["ps"] = 1.22, 0.5
+                    g["bb"], g["bhl"], g["bhr"] = 1.0, 1.0, 1.0
+            elif kind_ == "squint":                  # a suspicious squint
+                w_ = math.sin(math.pi * ph)
+                g["open"] = 1.0 - 0.45 * w_
+                g["bb"], g["btl"], g["btr"] = 1.0, 12 * w_, 12 * w_
+            elif kind_ == "browup":                  # one brow goes up
+                w_ = math.sin(math.pi * ph)
+                g["bb"] = 1.0
+                g["bhl" if anim_data["side"] == 0 else "bhr"] = 0.95 * w_
+            elif kind_ == "tilt":                    # head tilt: one eye a bit higher, a glance sideways
+                w_ = 0.5 - 0.5 * math.cos(2 * math.pi * ph)
+                g["ty"] = anim_data["dir"] * w_
+                g["gx"] = 0.35 * anim_data["dir"] * w_
+            elif kind_ == "droop":                   # eyelids get heavy for a moment, then it shakes it off
+                g["open"] = 1.0 - 0.5 * math.sin(math.pi * ph) ** 1.5
             elif kind_ == "roll":                    # eyes rolling: the pupils run a full circle, brows up
                 ang = ph * 2 * math.pi - math.pi / 2
                 g["gx"], g["gy"] = 0.95 * math.cos(ang), 0.95 * math.sin(ang)
@@ -631,6 +688,17 @@ def main():
         if mouth or emo == "talking":
             talk_phase += 0.9
             g["mo"] = max(0.0, math.sin(talk_phase) * 0.5 + random.uniform(-0.1, 0.2)) * 0.9
+        # continuous "alive" motion: breathing, tiny gaze jitter, slowly pulsing pupils
+        g["es"] *= 1 + 0.012 * math.sin(t0 * 1.3)
+        g["cyo"] += 1.8 * math.sin(t0 * 1.3 - 0.6)
+        if emo != "sleeping":
+            g["ps"] *= 1 + 0.07 * math.sin(t0 * 0.8)
+            if t0 > next_jit:
+                jit = (random.uniform(-0.07, 0.07), random.uniform(-0.05, 0.05))
+                next_jit = t0 + random.uniform(0.25, 1.1)
+            amp = 0.4 if tracking else (0.0 if anim and anim[0] in ("roll", "scan", "wiggle") else 1.0)
+            g["gx"] += jit[0] * amp
+            g["gy"] += jit[1] * amp
         # smooth
         k = 0.28
         for key in KEYS:
@@ -647,11 +715,12 @@ def main():
             blink_t0 = t0
         blink = 1.0
         if blink_t0 is not None:
-            x = (t0 - blink_t0) / 0.22
+            x = (t0 - blink_t0) / blink_dur
             if pending_shape is not None and x >= 0.5:
                 shape, pending_shape = pending_shape, None
             if x >= 1:
                 blink_t0 = None
+                blink_dur = random.uniform(0.17, 0.27)
                 next_blink = t0 + random.uniform(2.0, 6.0)
                 if random.random() < 0.15:
                     next_blink = t0 + 0.25   # double blink

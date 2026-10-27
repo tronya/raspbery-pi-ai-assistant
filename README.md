@@ -9,7 +9,7 @@ Marstek home battery. Everything runs on the Pi; only Telegram messages and the 
 
 | Part | File | What |
 |---|---|---|
-| Eyes | `pi/eyes.py` | 20 fps animated eyes on the framebuffer: 30+ emotions, brows, blinking, idle behaviours (look around, eye roll), sleep with a yawn, speech bubbles, "thinking" face with a progress bar, alert banners |
+| Eyes | `pi/eyes.py` | 20 fps animated eyes on the framebuffer: 30+ emotions, brows, blinking, continuous breathing and micro-saccades, idle behaviours every ~15-30 s (look around, peek, double take, squint, brow raise, head tilt, slow blink, drowsy droop, eye roll, short mini-emotions), sleep with a yawn, speech bubbles, "thinking" face with a progress bar, alert banners |
 | Face tracking | `pi/track.py` | YuNet face detector (OpenCV) → eyes follow you, size follows distance; FER+ reads your expression and the eyes mirror it. No frames are stored |
 | Touch menu | `pi/ui.py` | Tap the screen: Marstek, camera, system, work time, emotion picker, settings (with touch calibration, reboot/shutdown) |
 | Bot | `pi/bot.py` | Telegram bot (owner only): chat with a local model, emotions picked by keyword rules, `/photo`, `/screen`, `/status`, `/battery`, `/work`, emotion commands |

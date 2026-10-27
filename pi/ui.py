@@ -430,7 +430,9 @@ class App:
             ("cry", "Плаче"), ("embarrassed", "Ніяково"), ("angry", "Злість"), ("evil", "Підступний"), ("determined", "Рішучий"),
             ("suspicious", "Підозра"), ("bored", "Нудьга"), ("sleepy", "Сонний"), ("sick", "Нездужає"), ("dizzy", "Паморочиться"),
             ("dead", "Мертвий"), ("pain", "Біль"), ("money", "Гроші"),
-            ("roll", "Закотити очі"), ("scan", "Роззирнутись"), ("blink", "Кліпнути"), ("yawn", "Позіхнути")]
+            ("roll", "Закотити очі"), ("scan", "Роззирнутись"), ("blink", "Кліпнути"), ("yawn", "Позіхнути"),
+            ("peek", "Підглянути"), ("wiggle", "Крутнути"), ("dtake", "Глянути двічі"), ("squint", "Примружитись"),
+            ("browup", "Брова вгору"), ("tilt", "Нахилити"), ("slowblink", "Повільно"), ("droop", "Задрімати")]
 
     def draw_emotions(self):
         im, d = new()
@@ -443,7 +445,7 @@ class App:
             col, row = i % 4, i // 4
             x0, y0 = 8 + col * 118, 52 + row * 53
             rect = (x0, y0, x0 + 110, y0 + 46)
-            anim = key in ("roll", "scan", "blink")
+            anim = key in ("roll", "scan", "blink", "yawn", "peek", "wiggle", "dtake", "squint", "browup", "tilt", "slowblink", "droop")
             button(d, rect, label, fill=(46, 70, 100) if anim else TILE, f=F14)
             self.buttons.append((rect, "emo_" + key))
         return im

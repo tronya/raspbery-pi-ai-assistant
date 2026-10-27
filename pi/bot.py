@@ -11,7 +11,7 @@ HOME = os.path.expanduser("~")
 CMD = "/tmp/eyes_cmd"
 EMOTIONS = ["neutral", "happy", "sad", "angry", "thinking", "surprised", "sleepy", "love", "excited", "scared", "suspicious", "bored", "cry", "joy", "wink", "dizzy", "evil"]
 EXTRA = ["pain", "dead", "confused", "smug", "nervous", "sick", "laughing", "determined", "money", "curious",
-         "embarrassed", "yawn", "roll", "scan"]            # only via Telegram commands, the model does not choose them
+         "embarrassed", "yawn", "roll", "scan", "peek", "wiggle", "dtake", "squint", "browup", "tilt", "droop", "slowblink"]            # only via Telegram commands, the model does not choose them
 SYSTEM_EN = "You are Okko, a tiny friendly creature with eyes. Answer the user directly with ONE short sentence (max 12 words). "
 SYSTEM_UK = "Ти — Окко, маленька добра істота з очима. Відповідай ОДНИМ коротким реченням (до 12 слів) українською. "
 
